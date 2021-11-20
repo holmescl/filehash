@@ -1,0 +1,159 @@
+---
+title: Physical Activity Analysis
+author: Charnae Holmes
+output: html_document
+---
+
+```{r setoptions, echo = TRUE}
+knitr::opts_chunk$set(echo = TRUE, results ='asis')
+```
+
+# Loading and Preprocessing Data
+
+```{r activity}
+activity = read.csv('activity.csv')
+#activity
+```
+### Combining Dates for cumulative steps and creating dates dataframe
+```{r}
+activity$date = as.Date(activity$date)
+dates = activity$date
+unique_dates = unique(dates)
+#unique_dates  # 61 days total 
+```
+
+# What is mean total number of steps taken per day?
+
+1.  Calculate Total Number of Steps per Day 
+
+```{r}
+
+steps_day = tapply(X = activity$steps, INDEX = activity$date, FUN = sum, na.rm = T)
+#print(steps_day)
+```
+
+2. Histogram of the total number of steps taken each day 
+
+```{r}
+plot(unique_dates, steps_day, main="Histogram of Steps per Day", xlab="Date", ylab="Steps", type="h", lwd=4, col="darkmagenta")
+
+```
+
+3. Calculate Median Steps per Day
+
+```{r}
+sd_mean = mean(steps_day)
+sd_mean
+```
+```{r}
+sd_median = median(steps_day)
+sd_median
+```
+
+
+# What is the average daily activity pattern?
+
+1. Make a time series plotof the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+
+```{r}
+library(ggplot2)
+library(dplyr)
+# A list of all intervals
+unique_intervals = unique(activity$interval)
+# split all data based on interval 
+interval_split = split(activity$steps, activity$interval)
+# average steps per interval, ignoring na cvalues 
+asp_interval = sapply(interval_split, mean, na.rm = TRUE)
+# plot time series 
+plot(unique_intervals, asp_interval, type="l",
+     main="Average Steps per Interval", 
+     xlab="Interval", ylab="Average Steps", 
+     lwd=2, col="blue")
+# Find max location
+maxinterval_days = max(asp_interval, na.rm=TRUE)
+maxindex = as.numeric(which(asp_interval == maxinterval_days))
+
+# Plot a vertical line where  max is
+maxinterval = unique_intervals[maxindex]
+abline(v=maxinterval, col="red", lwd=3)
+
+```
+
+2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+```{r}
+maxinterval
+```
+
+# Imputing missing values
+
+
+1. Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+
+```{r}
+sum(is.na(activity$steps))
+```
+
+
+2. Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
+
+- I use the mean for the 5 minute interval. 
+
+3. Create a new dataset that is equal to the original dataset but with the missing data filled in.
+
+
+```{r}
+activity_imp = activity
+activity_imp$steps[which(is.na(activity$steps))] = as.numeric(asp_interval[as.character(activity$interval[which(is.na(activity$steps))])])
+#activity_imp
+```
+4. Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+- The mean and median do differ when imputing the mean of the interval for the NA values. Both the mean and the median are the same value. The average is higher than before, while the median is around the same value. 
+- Imputing missing data increases the estimates of the total daily number of steps.
+
+```{r}
+steps_day_imp = tapply(X = activity_imp$steps, INDEX = activity_imp$date, FUN = sum, na.rm = T)
+#print(steps_day_imp)
+```
+```{r}
+sd_median_imp = median(steps_day_imp)
+sd_median_imp
+```
+```{r}
+sd_mean_imp = mean(steps_day_imp)
+sd_mean_imp
+```
+
+
+```{r}
+plot(unique_dates, steps_day_imp, main="Histogram of Steps per Day", xlab="Date", ylab="Steps", type="h", lwd=4, col="darkmagenta")
+```
+
+# Are there differences in activity patterns between weekdays and weekends?
+
+- Weekend steps seems to be lower overall
+
+1. Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+
+```{r}
+activity_imp$type = ifelse(weekdays(activity_imp[,2]) == "Saturday" | weekdays(activity_imp[,2]) == "Sunday", 'weekend', 'weekday')
+```
+
+2. Make a panel plot containing a time series plot  of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis).
+
+```{r}
+activity_imp$type = as.factor(activity_imp$type)
+#str(activity_imp)
+aggregate_data = aggregate(x = activity_imp$steps,
+                            list(activity_imp$interval, activity_imp$type),
+                            FUN = "mean")
+names(aggregate_data) = c("interval","type", "steps")
+#str(aggregate_data)
+ggplot(aggregate_data, aes(interval, steps)) + 
+    geom_line() + 
+    facet_grid(type ~ .) +
+    xlab("Interval") + 
+    ylab("Average Steps")
+
+```
